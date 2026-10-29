@@ -78,7 +78,15 @@ function measuredOutcome(measured: Measured): Outcome {
   return "mixed";
 }
 
-function independenceOf(item: { disclosure: { affiliation: string; compensation: string; reseller: boolean } }, measured?: Measured): Independence {
+/**
+ * The one derivation of a record's independence (docs/TAXONOMY.md). A
+ * reporter's own `independence` is honoured only where it declares an
+ * interest the disclosure block cannot see (`vendor-sponsored`, `self`);
+ * it can never raise a disclosed interest back to `independent`.
+ * Exported because the evidence page must print the same grading as the
+ * coverage cell, and a second copy of this expression is how they drift.
+ */
+export function independenceOf(item: { disclosure: { affiliation: string; compensation: string; reseller: boolean } }, measured?: Measured): Independence {
   if (measured) {
     if (measured.independence === "vendor-sponsored") return "vendor-sponsored";
     if (measured.independence === "self") return "self";

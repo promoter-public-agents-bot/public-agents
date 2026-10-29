@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadRegistry } from "../src/lib/registry.ts";
 import { coverage } from "../src/lib/coverage.ts";
+import { evidenceForSite } from "../src/lib/evidence.ts";
 import { profileUrls, renderProfile } from "../src/lib/profile.ts";
 import { linkTargets } from "../src/lib/link-targets.ts";
 import { canonicalUrl } from "../src/lib/links.ts";
@@ -158,14 +159,17 @@ describe("loadRegistry", () => {
       const loaded = loadRegistry(root);
       expect(loaded.refusals).toEqual([]);
       const cell = coverage(loaded).get("cs.deflect-tier1")?.cells.find(c => c.solution.type === "tool" && c.solution.id === "exampleproduct");
-      return new Map(cell?.evidence.map(e => [e.id, e.independence]));
+      // Both views of one record: the job page reads the coverage cell, the evidence page reads
+      // `evidence[].independence` out of the site's data. One record must not have two answers.
+      const page = new Map(evidenceForSite(loaded).map(e => [e.id, e.independence]));
+      return new Map(cell?.evidence.map(e => [e.id, { cell: e.independence, page: page.get(e.id) }]));
     };
     const reportPath = `registry/evidence/case-reports/${report.id}.json`;
     const measuredPath = `registry/evidence/measured/${measured.id}.json`;
     expect(independenceIn({ [reportPath]: report, [measuredPath]: measured })).toEqual(
       new Map([
-        [report.id, "affiliated"],
-        [measured.id, "affiliated"]
+        [report.id, { cell: "affiliated", page: "affiliated" }],
+        [measured.id, { cell: "affiliated", page: "affiliated" }]
       ])
     );
     // the control: the same two records disclosing no affiliation do read independent, so the assertion above discriminates
@@ -176,8 +180,16 @@ describe("loadRegistry", () => {
       })
     ).toEqual(
       new Map([
-        [report.id, "independent"],
-        [measured.id, "independent"]
+        [report.id, { cell: "independent", page: "independent" }],
+        [measured.id, { cell: "independent", page: "independent" }]
+      ])
+    );
+    // the other precedence, deliberate: a measurement declaring a non-independence keeps the label it
+    // declared, because `self` and `vendor-sponsored` say something the disclosure block cannot see
+    expect(independenceIn({ [reportPath]: report, [measuredPath]: { ...measured, independence: "self" } })).toEqual(
+      new Map([
+        [report.id, { cell: "affiliated", page: "affiliated" }],
+        [measured.id, { cell: "self", page: "self" }]
       ])
     );
   });
